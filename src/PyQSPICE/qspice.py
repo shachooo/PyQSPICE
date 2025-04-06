@@ -188,6 +188,7 @@ class clsQSPICE:
 					line = qux.stdout.readline()
 					if line == '\n': continue        
 					if line.startswith("Values:"): break
+					if line.startswith("Trouble parsing"):break
 					if line.startswith("No. Points:"):
 						self.sim['Nstep'] = int(int(re.match(r'^No. Points:\s*(\d+).*', line).group(1)) / (Nline + 1))
 					if line.startswith("Plotname:"):
