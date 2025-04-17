@@ -26,7 +26,7 @@ class clsQSPICE:
 	usrp = gpath['home'] + "/QSPICE/"
 	sysp = r"c:/Program Files/QSPICE/"
 
-	for exe in ['QUX', 'QSPICE64', 'QSPICE80']:
+	for exe in ['QUX', 'QSPICE64', 'QSPICE80','QPOST']:
 		if os.path.isfile(sysp + exe + '.exe'): gpath[exe] = sysp + exe + '.exe'
 # User path has priority
 		if os.path.isfile(usrp + exe + '.exe'): gpath[exe] = usrp + exe + '.exe'
@@ -54,7 +54,8 @@ class clsQSPICE:
 
 		self.path['user'] = fname
 		self.path['base'] = fname.removesuffix('.qsch').removesuffix('.qraw').removesuffix('.cir')
-		clsQSPICE.tstime(self, ['qsch', 'qraw', 'cir', 'utf8'])
+#		clsQSPICE.tstime(self, ['qsch', 'qraw', 'cir', 'utf8'])
+		clsQSPICE.tstime(self, ['qsch', 'qraw', 'cir', 'utf8','log','logutf8'])
 
 # How many data points to read from QRAW simulation result files
 # Too small, too zigzag; too big, too slow ☹    
@@ -148,7 +149,34 @@ class clsQSPICE:
 
 		self.sim['label=' + label] = {'label': label, 'Nline': self.sim['Nline'], 'Nbit': self.sim['Nbit']}
 		self.sim['labels'] += [label]
+	def cir2log(self):
+		print(self.gpath['QPOST'], self.path['cir'], "-o log.txt",self.path['log'])
 
+		if self.ts['cir']:
+			with open(self.path['log'], "w") as ofile:
+				subprocess.run([self.gpath['QPOST'], self.path['cir'], "-o",self.path['log']], stdout=ofile)
+				clsQSPICE.tstime(self, ['log'])
+			with codecs.open(self.path['log'], 'r', 'latin_1') as ifile:
+				lines = ifile.read()
+			with codecs.open(self.path['logutf8'], 'w', 'utf_8') as ofile:
+				ofile.write(lines)
+				clsQSPICE.tstime(self, ['logutf8'])
+	def LoadMEAS(self):
+		measdata={}
+		with open(self.path['logutf8'], 'r') as file:
+			for line in file:
+				if line.startswith(".meas"):
+					word=line.split()
+					 
+					if(word[1]=='tran'):
+						param=word[2]
+					else:
+						param=word[1]
+				else:
+					 word=line.split()
+					 value=word[0]
+					 measdata[param]=value
+		return measdata
 # Run a simulation from the netlist CIR file
 	def cir2qraw(self, label = ""):
 		if self.sim['label'] != 'default': label = self.sim['label']
@@ -188,6 +216,7 @@ class clsQSPICE:
 					line = qux.stdout.readline()
 					if line == '\n': continue        
 					if line.startswith("Values:"): break
+					if line.startswith("Trouble parsing"):break
 					if line.startswith("No. Points:"):
 						self.sim['Nstep'] = int(int(re.match(r'^No. Points:\s*(\d+).*', line).group(1)) / (Nline + 1))
 					if line.startswith("Plotname:"):
